@@ -54,13 +54,16 @@ from keras.preprocessing.image import ImageDataGenerator
 
 # Generator object for data augmentation.
 # Can change values here to affect augmentation style.
-datagen = ImageDataGenerator(   #rotation_range=10,
+datagen = ImageDataGenerator(   rotation_range=10,
                                 width_shift_range=0.05,
                                 height_shift_range=0.05,
+                                #shear_range=0.01,
                                 zoom_range=0.10,
                                 #brightness_range=[0.95,1.05],
+                                fill_mode='reflect',
                                 horizontal_flip=True,
                                 vertical_flip=True,
+                                preprocessing_function=keras.applications.resnet50.preprocess_input
                                 )
 
 
@@ -93,6 +96,7 @@ def createModel(numk=1):
     # New Layers 
     net = net_model.output
     gap = kl.GlobalAveragePooling2D()(net)
+    #gap = kl.Dropout(0.5)(gap)
     outnet = kl.Dense(numk, activation='sigmoid')(gap)
 
     # model creation
@@ -103,7 +107,7 @@ def createModel(numk=1):
     for layer in base_model.layers:
         print(layer, layer.trainable)
 
-    base_model.compile(optimizer=keras.optimizers.Adadelta(lr=0.1, decay=0.00001), loss=keras.losses.mean_squared_error, metrics=[keras.metrics.categorical_accuracy, keras.losses.categorical_crossentropy])
+    base_model.compile(optimizer=keras.optimizers.Adadelta(lr=0.1, decay=0.0001), loss=keras.losses.mean_squared_error, metrics=[keras.metrics.categorical_accuracy, keras.losses.categorical_crossentropy])
 
     return base_model
 
@@ -326,14 +330,14 @@ def learn(argv):
 
             if ( t_imloaded == 0 or total_t_ch > 1 ): 
                 print 'Reading image lists ...'
-                images_t = t_read_image_list(in_t_i, t*chunksize, chunksize)
+                images_t = t_read_image_list(in_t_i, t*chunksize, chunksize, color=1, norm=0, prep=0)
                 maps_t = cmap_t[t*chunksize:(t+1)*chunksize,:] 
                 t_imloaded = 1
 
             print 'Starting to fit ...'
 
             # This method uses data augmentation
-            model.fit_generator(generator=createDataGen(images_t,maps_t,batch), steps_per_epoch=len(images_t) / batch, epochs=1, shuffle=False, use_multiprocessing=True)
+            model.fit_generator(generator=createDataGen(images_t,maps_t,batch), steps_per_epoch=len(images_t) / batch, epochs=1, shuffle=False, use_multiprocessing=True, class_weight=cw)
         
         # In case the validation images don't fit in memory, we load chunks from disk again. 
         val_res = [0.0, 0.0]
@@ -344,7 +348,7 @@ def learn(argv):
 
             if ( v_imloaded == 0 or total_v_ch > 1 ):
                 print 'Loading validation image lists ...'
-                images_v = t_read_image_list(in_v_i, v*chunksize, chunksize)
+                images_v = t_read_image_list(in_v_i, v*chunksize, chunksize, color=1, norm=0, prep=1)
                 maps_v = cmap_v[v*chunksize:(v+1)*chunksize,:]
                 v_imloaded = 1
 
